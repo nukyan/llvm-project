@@ -505,6 +505,21 @@ void associative_container_benchmarks(std::string container) {
     bench("equal_range(key) (existent)", with_existent_key(equal_range));
     bench("equal_range(key) (non-existent)", with_nonexistent_key(equal_range));
   }
+
+  /////////////////////////
+  // Iterate
+  /////////////////////////
+  bench("iterate", [=](auto& st) {
+    const std::size_t size = st.range(0);
+    std::vector<Value> in  = make_value_types(generate_unique_keys(size));
+    Container c(in.begin(), in.end());
+
+    while (st.KeepRunningBatch(BatchSize)) {
+      for (auto i = c.begin(), j = c.end(); i != j; ++i) {
+        benchmark::DoNotOptimize(*i);
+      }
+    }
+  });
 }
 
 } // namespace support
