@@ -30,18 +30,17 @@ _LIBCPP_BEGIN_NAMESPACE_STD
 template <class _AlgPolicy, class _Compare, class _RandomAccessIterator>
 _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX14 void
 __sift_up(_RandomAccessIterator __first, _RandomAccessIterator __bottom, _Compare&& __comp) {
-  using difference_type = typename iterator_traits<_RandomAccessIterator>::difference_type;
-  using value_type      = typename iterator_traits<_RandomAccessIterator>::value_type;
+  using _Ops = _IterOps<_AlgPolicy>;
 
-  difference_type __parent = __bottom - __first;
+  __iter_diff_t<_RandomAccessIterator> __parent = __bottom - __first;
   _LIBCPP_ASSERT_INTERNAL(__parent > 0, "shouldn't be called unless __bottom - __first > 0");
   __parent                         = (__parent - 1) / 2;
   _RandomAccessIterator __parent_i = __first + __parent;
 
   if (__comp(*__parent_i, *__bottom)) {
-    value_type __t(_IterOps<_AlgPolicy>::__iter_move(__bottom));
+    __iter_value_type<_RandomAccessIterator> __t(_Ops::__iter_move(__bottom));
     do {
-      *__bottom = _IterOps<_AlgPolicy>::__iter_move(__parent_i);
+      *__bottom = _Ops::__iter_move(__parent_i);
       __bottom  = __parent_i;
       if (__parent == 0)
         break;
