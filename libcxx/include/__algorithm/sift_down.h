@@ -50,15 +50,12 @@ __sift_down(_RandomAccessIterator __first,
             __iter_diff_t<_RandomAccessIterator> __start) {
   using _Ops = _IterOps<_AlgPolicy>;
 
-  typedef typename iterator_traits<_RandomAccessIterator>::difference_type difference_type;
-  typedef typename iterator_traits<_RandomAccessIterator>::value_type value_type;
-
   if (__len < 2)
     return;
 
   // left-child of __start is at 2 * __start + 1
   // right-child of __start is at 2 * __start + 2
-  difference_type __child         = 2 * __start + 1;
+  __iter_diff_t<_RandomAccessIterator> __child = 2 * __start + 1;
   _RandomAccessIterator __child_i = __first + __child, __start_i = __first + __start;
 
   __choose_child<_AlgPolicy, __assume_both_children>(__child_i, __child, __len - 1, __comp);
@@ -68,7 +65,7 @@ __sift_down(_RandomAccessIterator __first,
     // we are, __start is larger than its largest child
     return;
 
-  value_type __top(_Ops::__iter_move(__start_i));
+  __iter_value_type<_RandomAccessIterator> __top(_Ops::__iter_move(__start_i));
   do {
     // we are not in heap-order, swap the parent with its largest child
     *__start_i = _Ops::__iter_move(__child_i);
@@ -91,15 +88,11 @@ __sift_down(_RandomAccessIterator __first,
 template <class _AlgPolicy, class _Compare, class _RandomAccessIterator>
 _LIBCPP_HIDE_FROM_ABI
 _LIBCPP_CONSTEXPR_SINCE_CXX14 std::pair<_RandomAccessIterator, __iter_diff_t<_RandomAccessIterator>>
-__floyd_sift_down(_RandomAccessIterator __first,
-                  _Compare&& __comp,
-                  typename iterator_traits<_RandomAccessIterator>::difference_type __len) {
+__floyd_sift_down(_RandomAccessIterator __first, _Compare&& __comp, __iter_diff_t<_RandomAccessIterator> __len) {
   _LIBCPP_ASSERT_INTERNAL(__len > 0, "shouldn't be called unless __len > 0");
   using _Ops = _IterOps<_AlgPolicy>;
 
-  typedef typename iterator_traits<_RandomAccessIterator>::difference_type difference_type;
-
-  difference_type __child      = 1;
+  __iter_diff_t<_RandomAccessIterator> __child = 1;
   _RandomAccessIterator __hole = __first, __child_i = __first;
 
   while (__child <= __len / 2) {
