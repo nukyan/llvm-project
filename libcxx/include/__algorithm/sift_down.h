@@ -14,6 +14,7 @@
 #include <__config>
 #include <__iterator/iterator_traits.h>
 #include <__utility/move.h>
+#include <__utility/pair.h>
 
 #if !defined(_LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER)
 #  pragma GCC system_header
@@ -88,12 +89,12 @@ __sift_down(_RandomAccessIterator __first,
 }
 
 template <class _AlgPolicy, class _Compare, class _RandomAccessIterator>
-_LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX14 _RandomAccessIterator __floyd_sift_down(
-    _RandomAccessIterator __first,
-    _Compare&& __comp,
-    typename iterator_traits<_RandomAccessIterator>::difference_type __len) {
-  _LIBCPP_ASSERT_INTERNAL(__len > 1, "shouldn't be called unless __len > 1");
-
+_LIBCPP_HIDE_FROM_ABI
+_LIBCPP_CONSTEXPR_SINCE_CXX14 std::pair<_RandomAccessIterator, __iter_diff_t<_RandomAccessIterator>>
+__floyd_sift_down(_RandomAccessIterator __first,
+                  _Compare&& __comp,
+                  typename iterator_traits<_RandomAccessIterator>::difference_type __len) {
+  _LIBCPP_ASSERT_INTERNAL(__len > 0, "shouldn't be called unless __len > 0");
   using _Ops = _IterOps<_AlgPolicy>;
 
   typedef typename iterator_traits<_RandomAccessIterator>::difference_type difference_type;
@@ -101,19 +102,18 @@ _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX14 _RandomAccessIterator __floy
   difference_type __child      = 1;
   _RandomAccessIterator __hole = __first, __child_i = __first;
 
-  do {
+  while (__child <= __len / 2) {
     __child_i += __child;
     __child *= 2;
 
-    __choose_child<_AlgPolicy, false>(__child_i, __child, __len, __comp);
+    __choose_child<_AlgPolicy, true>(__child_i, __child, __len, __comp);
 
     // swap __hole with its largest child
     *__hole = _Ops::__iter_move(__child_i);
     __hole  = __child_i;
-
-    // if __hole is now a leaf, we're done
-  } while (__child <= __len / 2);
-  return __hole;
+  }
+  // if __hole is now a leaf, we're done
+  return std::make_pair(__hole, __child);
 }
 
 _LIBCPP_END_NAMESPACE_STD

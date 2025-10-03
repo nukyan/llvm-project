@@ -39,14 +39,16 @@ __pop_heap(_RandomAccessIterator __first,
   using value_type = typename iterator_traits<_RandomAccessIterator>::value_type;
 
   value_type __top             = _IterOps<_AlgPolicy>::__iter_move(__first); // create a hole at __first
-  _RandomAccessIterator __hole = std::__floyd_sift_down<_AlgPolicy>(__first, __comp, __len);
+  auto __ret                   = std::__floyd_sift_down<_AlgPolicy>(__first, __comp, (__len & 1) ? __len : __len - 1);
+  _RandomAccessIterator __hole = __ret.first;
 
   if (__hole == __bottom) {
     *__hole = std::move(__top);
   } else {
     *__hole   = _IterOps<_AlgPolicy>::__iter_move(__bottom);
     *__bottom = std::move(__top);
-    std::__sift_up<_AlgPolicy>(__first, __hole, __comp);
+    if (__ret.second > __len / 2)
+      std::__sift_up<_AlgPolicy>(__first, __hole, __comp);
   }
 }
 
