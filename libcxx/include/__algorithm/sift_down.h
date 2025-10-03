@@ -26,6 +26,23 @@ _LIBCPP_BEGIN_NAMESPACE_STD
 
 template <class _AlgPolicy, bool __assume_both_children, class _Compare, class _RandomAccessIterator>
 _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX14 void
+__choose_child(_RandomAccessIterator& __left,
+               __iter_diff_t<_RandomAccessIterator>& __pos,
+               __iter_diff_t<_RandomAccessIterator> __bound,
+               _Compare&& __comp) {
+  if (__assume_both_children || __pos < __bound) {
+    _RandomAccessIterator __right = _IterOps<_AlgPolicy>::next(__left);
+    bool __result                 = __comp(*__left, *__right);
+    if _LIBCPP_CONSTEXPR (__libcpp_is_contiguous_iterator<_RandomAccessIterator>::value)
+      __left += __result;
+    else
+      __left = __result ? __right : __left;
+    __pos += __result;
+  }
+}
+
+template <class _AlgPolicy, bool __assume_both_children, class _Compare, class _RandomAccessIterator>
+_LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX14 void
 __sift_down(_RandomAccessIterator __first,
             _Compare&& __comp,
             __iter_diff_t<_RandomAccessIterator> __len,
@@ -34,50 +51,40 @@ __sift_down(_RandomAccessIterator __first,
 
   typedef typename iterator_traits<_RandomAccessIterator>::difference_type difference_type;
   typedef typename iterator_traits<_RandomAccessIterator>::value_type value_type;
-  // left-child of __start is at 2 * __start + 1
-  // right-child of __start is at 2 * __start + 2
-  difference_type __child = __start;
 
   if (__len < 2)
     return;
 
-  __child = 2 * __child + 1;
+  // left-child of __start is at 2 * __start + 1
+  // right-child of __start is at 2 * __start + 2
+  difference_type __child         = 2 * __start + 1;
+  _RandomAccessIterator __child_i = __first + __child, __start_i = __first + __start;
 
-  if _LIBCPP_CONSTEXPR (__assume_both_children) {
-    // right-child exists and is greater than left-child
-    __child += __comp(__first[__child], __first[__child + 1]);
-  } else if ((__child + 1) < __len && __comp(__first[__child], __first[__child + 1])) {
-    // right-child exists and is greater than left-child
-    ++__child;
-  }
+  __choose_child<_AlgPolicy, __assume_both_children>(__child_i, __child, __len - 1, __comp);
 
   // check if we are in heap-order
-  if (__comp(__first[__child], __first[__start]))
+  if (__comp(*__child_i, *__start_i))
     // we are, __start is larger than its largest child
     return;
 
-  value_type __top(_Ops::__iter_move(__first + __start));
+  value_type __top(_Ops::__iter_move(__start_i));
   do {
     // we are not in heap-order, swap the parent with its largest child
-    __first[__start] = _Ops::__iter_move(__first + __child);
-    __start          = __child;
+    *__start_i = _Ops::__iter_move(__child_i);
+    __start_i  = __child_i;
 
     if (__len / 2 - 1 < __child)
       break;
 
     // recompute the child based off of the updated parent
-    __child = 2 * __child + 1;
+    __child   = 2 * __child + 1;
+    __child_i = __first + __child;
 
-    if _LIBCPP_CONSTEXPR (__assume_both_children) {
-      __child += __comp(__first[__child], __first[__child + 1]);
-    } else if ((__child + 1) < __len && __comp(__first[__child], __first[__child + 1])) {
-      // right-child exists and is greater than left-child
-      ++__child;
-    }
+    __choose_child<_AlgPolicy, __assume_both_children>(__child_i, __child, __len - 1, __comp);
 
     // check if we are in heap-order
-  } while (!__comp(__first[__child], __top));
-  __first[__start] = std::move(__top);
+  } while (!__comp(*__child_i, __top));
+  *__start_i = std::move(__top);
 }
 
 template <class _AlgPolicy, class _Compare, class _RandomAccessIterator>
@@ -98,11 +105,7 @@ _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX14 _RandomAccessIterator __floy
     __child_i += __child;
     __child *= 2;
 
-    if (__child < __len && __comp(*__child_i, *(__child_i + difference_type(1)))) {
-      // right-child exists and is greater than left-child
-      ++__child_i;
-      ++__child;
-    }
+    __choose_child<_AlgPolicy, false>(__child_i, __child, __len, __comp);
 
     // swap __hole with its largest child
     *__hole = _Ops::__iter_move(__child_i);
