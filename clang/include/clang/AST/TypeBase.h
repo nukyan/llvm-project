@@ -2001,7 +2001,7 @@ protected:
 
     /// The type of exception specification this function has.
     LLVM_PREFERRED_TYPE(ExceptionSpecificationType)
-    unsigned ExceptionSpecType : 4;
+    unsigned ExceptionSpecType : 5;
 
     /// Whether this function has extended parameter information.
     LLVM_PREFERRED_TYPE(bool)
@@ -5421,6 +5421,9 @@ public:
     /// Noexcept expression, if this is a computed noexcept specification.
     Expr *NoexceptExpr = nullptr;
 
+    /// Throws expression, if this is a computed throws specification.
+    Expr *ThrowsExpr = nullptr;
+
     /// The function whose exception specification this is, for
     /// EST_Unevaluated and EST_Uninstantiated.
     FunctionDecl *SourceDecl = nullptr;
@@ -5581,6 +5584,7 @@ private:
     case EST_BasicNoexcept:
     case EST_Unparsed:
     case EST_NoThrow:
+    case EST_BasicThrows:
       return {0, 0, 0};
 
     case EST_Dynamic:
@@ -5589,6 +5593,10 @@ private:
     case EST_DependentNoexcept:
     case EST_NoexceptFalse:
     case EST_NoexceptTrue:
+    case EST_DependentThrows:
+    case EST_ThrowsFalse:
+    case EST_ThrowsTrue:
+    case EST_ThrowsDynamic:
       return {0, 1, 0};
 
     case EST_Uninstantiated:
@@ -5694,6 +5702,8 @@ public:
       Result.Exceptions = exceptions();
     } else if (isComputedNoexcept(Result.Type)) {
       Result.NoexceptExpr = getNoexceptExpr();
+    } else if (isComputedThrows(Result.Type)) {
+      Result.ThrowsExpr = getThrowsExpr();
     } else if (Result.Type == EST_Uninstantiated) {
       Result.SourceDecl = getExceptionSpecDecl();
       Result.SourceTemplate = getExceptionSpecTemplate();
@@ -5724,6 +5734,17 @@ public:
       return nullptr;
     return *getTrailingObjects<Expr *>();
   }
+
+  /// Return the expression inside throws(expression), or a null pointer
+  /// if there is none (because the exception spec is not of this form).
+  Expr *getThrowsExpr() const {
+    if (!isComputedThrows(getExceptionSpecType()))
+      return nullptr;
+    return *getTrailingObjects<Expr *>();
+  }
+
+  /// Compute a summarized exception specification result for codegen.
+  ExceptionSpecificationResult getExceptionSpecificationComputeResult() const;
 
   /// If this function type has an exception specification which hasn't
   /// been determined yet (either because it has not been evaluated or because

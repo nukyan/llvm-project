@@ -1391,7 +1391,7 @@ struct DeclaratorChunk {
 
     /// ExceptionSpecType - An ExceptionSpecificationType value.
     LLVM_PREFERRED_TYPE(ExceptionSpecificationType)
-    unsigned ExceptionSpecType : 4;
+    unsigned ExceptionSpecType : 5;
 
     /// DeleteParams - If this is true, we need to delete[] Params.
     LLVM_PREFERRED_TYPE(bool)
@@ -1455,6 +1455,10 @@ struct DeclaratorChunk {
       /// Pointer to the expression in the noexcept-specifier of this
       /// function, if it has one.
       Expr *NoexceptExpr;
+
+      /// Pointer to the expression in the throws-specifier of this
+      /// function, if it has one.
+      Expr *ThrowsExpr;
 
       /// Pointer to the cached tokens for an exception-specification
       /// that has not yet been parsed.
@@ -1743,6 +1747,7 @@ struct DeclaratorChunk {
                                      SourceRange *ExceptionRanges,
                                      unsigned NumExceptions,
                                      Expr *NoexceptExpr,
+                                     Expr *ThrowsExpr,
                                      CachedTokens *ExceptionSpecTokens,
                                      ArrayRef<NamedDecl *> DeclsInPrototype,
                                      SourceLocation LocalRangeBegin,

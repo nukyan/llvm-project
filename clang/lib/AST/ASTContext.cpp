@@ -4948,6 +4948,12 @@ static bool isCanonicalExceptionSpecification(
   if (ESI.Type == EST_DependentNoexcept)
     return true;
 
+  // P0709 throws specifications.
+  if (ESI.Type == EST_BasicThrows)
+    return true;
+  if (ESI.Type == EST_DependentThrows)
+    return true;
+
   // A dynamic exception specification is canonical if it only contains pack
   // expansions (so we can't tell whether it's non-throwing) and all its
   // contained types are canonical.
@@ -4989,8 +4995,11 @@ QualType ASTContext::getFunctionTypeInternal(
     // noexcept expression, or we're just looking for a canonical type.
     // Otherwise, we're going to need to create a type
     // sugar node to hold the concrete expression.
-    if (OnlyWantCanonical || !isComputedNoexcept(EPI.ExceptionSpec.Type) ||
-        EPI.ExceptionSpec.NoexceptExpr == FPT->getNoexceptExpr())
+    if (OnlyWantCanonical ||
+        (!isComputedNoexcept(EPI.ExceptionSpec.Type) &&
+         !isComputedThrows(EPI.ExceptionSpec.Type)) ||
+        EPI.ExceptionSpec.NoexceptExpr == FPT->getNoexceptExpr() ||
+        EPI.ExceptionSpec.ThrowsExpr == FPT->getThrowsExpr())
       return Existing;
 
     // We need a new type sugar node for this one, to hold the new noexcept
@@ -5037,6 +5046,7 @@ QualType ASTContext::getFunctionTypeInternal(
         // should ever look at this.
         [[fallthrough]];
       case EST_None: case EST_MSAny: case EST_NoexceptFalse:
+      case EST_ThrowsDynamic:
         CanonicalEPI.ExceptionSpec.Type = EST_None;
         break;
 
@@ -5062,11 +5072,19 @@ QualType ASTContext::getFunctionTypeInternal(
       case EST_BasicNoexcept:
       case EST_NoexceptTrue:
       case EST_NoThrow:
+      case EST_ThrowsFalse:
         CanonicalEPI.ExceptionSpec.Type = EST_BasicNoexcept;
+        break;
+
+      case EST_ThrowsTrue:
+      case EST_BasicThrows:
+        CanonicalEPI.ExceptionSpec.Type = EST_BasicThrows;
         break;
 
       case EST_DependentNoexcept:
         llvm_unreachable("dependent noexcept is already canonical");
+      case EST_DependentThrows:
+        llvm_unreachable("dependent throws is already canonical");
       }
     } else {
       CanonicalEPI.ExceptionSpec = FunctionProtoType::ExceptionSpecInfo();
@@ -14175,8 +14193,16 @@ ASTContext::mergeExceptionSpecs(FunctionProtoType::ExceptionSpecInfo ESI1,
                                 bool AcceptDependent) const {
   ExceptionSpecificationType EST1 = ESI1.Type, EST2 = ESI2.Type;
 
+  // If either uses static exceptions (P0709 throws), that wins.
+  for (auto I : {EST_BasicThrows, EST_ThrowsTrue}) {
+    if (EST1 == I)
+      return ESI1;
+    if (EST2 == I)
+      return ESI2;
+  }
+
   // If either of them can throw anything, that is the result.
-  for (auto I : {EST_None, EST_MSAny, EST_NoexceptFalse}) {
+  for (auto I : {EST_None, EST_MSAny, EST_NoexceptFalse, EST_ThrowsDynamic}) {
     if (EST1 == I)
       return ESI1;
     if (EST2 == I)
@@ -14184,20 +14210,17 @@ ASTContext::mergeExceptionSpecs(FunctionProtoType::ExceptionSpecInfo ESI1,
   }
 
   // If either of them is non-throwing, the result is the other.
-  for (auto I :
-       {EST_NoThrow, EST_DynamicNone, EST_BasicNoexcept, EST_NoexceptTrue}) {
+  for (auto I : {EST_NoThrow, EST_DynamicNone, EST_BasicNoexcept,
+                 EST_NoexceptTrue, EST_ThrowsFalse}) {
     if (EST1 == I)
       return ESI2;
     if (EST2 == I)
       return ESI1;
   }
 
-  // If we're left with value-dependent computed noexcept expressions, we're
-  // stuck. Before C++17, we can just drop the exception specification entirely,
-  // since it's not actually part of the canonical type. And this should never
-  // happen in C++17, because it would mean we were computing the composite
-  // pointer type of dependent types, which should never happen.
-  if (EST1 == EST_DependentNoexcept || EST2 == EST_DependentNoexcept) {
+  // If we're left with value-dependent computed expressions, we're stuck.
+  if (EST1 == EST_DependentNoexcept || EST2 == EST_DependentNoexcept ||
+      EST1 == EST_DependentThrows || EST2 == EST_DependentThrows) {
     assert(AcceptDependent &&
            "computing composite pointer type of dependent types");
     return FunctionProtoType::ExceptionSpecInfo();
@@ -14214,6 +14237,11 @@ ASTContext::mergeExceptionSpecs(FunctionProtoType::ExceptionSpecInfo ESI1,
   case EST_NoexceptFalse:
   case EST_NoexceptTrue:
   case EST_NoThrow:
+  case EST_BasicThrows:
+  case EST_DependentThrows:
+  case EST_ThrowsFalse:
+  case EST_ThrowsTrue:
+  case EST_ThrowsDynamic:
     llvm_unreachable("These ESTs should be handled above");
 
   case EST_Dynamic: {
