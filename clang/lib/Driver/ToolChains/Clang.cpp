@@ -205,8 +205,8 @@ static bool addExceptionArgs(const ArgList &Args, types::ID InputType,
   Args.addOptInFlag(CmdArgs, options::OPT_fassume_nothrow_exception_dtor,
                     options::OPT_fno_assume_nothrow_exception_dtor);
 
-  Args.addOptInFlag(CmdArgs, options::OPT_fstatic_exceptions,
-                    options::OPT_fno_static_exceptions);
+  Args.addOptInFlag(CmdArgs, options::OPT_fherbception,
+                    options::OPT_fno_herbception);
 
   if (EH)
     CmdArgs.push_back("-fexceptions");

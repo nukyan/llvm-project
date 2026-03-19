@@ -161,8 +161,7 @@ ExprResult Sema::ActOnThrowsSpecExpr(Expr *ThrowsExpr,
   if (Converted.isInvalid()) {
     EST = EST_ThrowsFalse;
     auto *ZeroExpr = new (Context) IntegerLiteral(
-        Context, llvm::APSInt::get(0), TargetType,
-        ThrowsExpr->getBeginLoc());
+        Context, llvm::APSInt::get(0), TargetType, ThrowsExpr->getBeginLoc());
     llvm::APSInt Value{2};
     Value = 0;
     return ConstantExpr::Create(Context, ZeroExpr, APValue{Value});
@@ -174,8 +173,7 @@ ExprResult Sema::ActOnThrowsSpecExpr(Expr *ThrowsExpr,
          diag::err_throws_expression_value_out_of_range)
         << Result.getExtValue();
     auto *ZeroExpr = new (Context) IntegerLiteral(
-        Context, llvm::APSInt::get(0), TargetType,
-        ThrowsExpr->getBeginLoc());
+        Context, llvm::APSInt::get(0), TargetType, ThrowsExpr->getBeginLoc());
     llvm::APSInt Value{2};
     Value = 0;
     return ConstantExpr::Create(Context, ZeroExpr, APValue{Value});

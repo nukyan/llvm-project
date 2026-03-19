@@ -1,5 +1,5 @@
-// RUN: %clang_cc1 -std=c++17 -fstatic-exceptions -fsyntax-only -verify %s
-// RUN: %clang_cc1 -std=c++20 -fstatic-exceptions -fsyntax-only -verify %s
+// RUN: %clang_cc1 -std=c++17 -fherbception -fsyntax-only -verify %s
+// RUN: %clang_cc1 -std=c++20 -fherbception -fsyntax-only -verify %s
 
 #include <stderror>
 

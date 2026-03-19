@@ -1402,8 +1402,7 @@ ExprResult Parser::ParseLambdaExpressionAfterIntroducer(
 
     ESpecType = tryParseExceptionSpecification(
         /*Delayed=*/false, ESpecRange, DynamicExceptions,
-        DynamicExceptionRanges, NoexceptExpr, ThrowsExpr,
-        ExceptionSpecTokens);
+        DynamicExceptionRanges, NoexceptExpr, ThrowsExpr, ExceptionSpecTokens);
 
     if (ESpecType != EST_None)
       DeclEndLoc = ESpecRange.getEnd();

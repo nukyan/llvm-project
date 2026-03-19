@@ -2307,8 +2307,8 @@ defm assume_nothrow_exception_dtor: BoolFOption<"assume-nothrow-exception-dtor",
   LangOpts<"AssumeNothrowExceptionDtor">, DefaultFalse,
   PosFlag<SetTrue, [], [ClangOption, CC1Option], "Assume that exception objects' destructors are non-throwing">,
   NegFlag<SetFalse>>;
-defm static_exceptions: BoolFOption<"static-exceptions",
-  LangOpts<"StaticExceptions">, DefaultFalse,
+defm herbception: BoolFOption<"herbception",
+  LangOpts<"Herbception">, DefaultFalse,
   PosFlag<SetTrue, [], [ClangOption, CC1Option],
           "Enable static exception specifications (P0709 throws)">,
   NegFlag<SetFalse>>;

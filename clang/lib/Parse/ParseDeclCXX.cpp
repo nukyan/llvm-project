@@ -3920,7 +3920,7 @@ ExceptionSpecificationType Parser::tryParseExceptionSpecification(
   // Handle delayed parsing of exception-specifications.
   if (Delayed) {
     if (Tok.isNot(tok::kw_throw) && Tok.isNot(tok::kw_noexcept) &&
-        !(getLangOpts().StaticExceptions && Tok.is(tok::kw_throws)))
+        !(getLangOpts().Herbception && Tok.is(tok::kw_throws)))
       return EST_None;
 
     // Consume and cache the starting token.
@@ -4007,7 +4007,7 @@ ExceptionSpecificationType Parser::tryParseExceptionSpecification(
   }
 
   // Parse P0709 throws specification if enabled and present.
-  if (getLangOpts().StaticExceptions && Tok.is(tok::kw_throws)) {
+  if (getLangOpts().Herbception && Tok.is(tok::kw_throws)) {
     if (Result != EST_None)
       Diag(Tok.getLocation(), diag::err_dynamic_and_noexcept_specification);
     else

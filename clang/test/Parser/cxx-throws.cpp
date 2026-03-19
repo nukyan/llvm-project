@@ -1,4 +1,4 @@
-// RUN: %clang_cc1 -std=c++17 -fstatic-exceptions -fsyntax-only -verify %s
+// RUN: %clang_cc1 -std=c++17 -fherbception -fsyntax-only -verify %s
 
 // Basic throws specification
 void f1() throws;
@@ -15,8 +15,8 @@ struct S {
   void m2() const throws;
 };
 
-// Throws without -fstatic-exceptions should fail
-// (tested separately - this file uses -fstatic-exceptions)
+// Throws without -fherbception should fail
+// (tested separately - this file uses -fherbception)
 
 // Throws cannot be combined with throw()
 void f_bad1() throw() throws; // expected-error {{cannot have both}}
