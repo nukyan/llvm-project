@@ -1077,6 +1077,7 @@ set(files
   stack
   stdatomic.h
   stddef.h
+  stderror
   stdexcept
   stdio.h
   stdlib.h
