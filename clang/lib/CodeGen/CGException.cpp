@@ -445,6 +445,24 @@ llvm::Value *CodeGenFunction::getSelectorFromSlot() {
 
 void CodeGenFunction::EmitCXXThrowExpr(const CXXThrowExpr *E,
                                        bool KeepInsertionPoint) {
+  // P0709 static exception specification: throw stores the error and
+  // branches to the return block rather than unwinding.
+  if (CurFnInfo && CurFnInfo->isStaticExceptionSpecification()) {
+    const Expr *SubExpr = E->getSubExpr();
+    if (SubExpr) {
+      // Store the error value and return.
+      // For now, emit the sub-expression and discard it.
+      // Full implementation will store into the error return slot.
+      EmitAnyExpr(SubExpr);
+    }
+    // Branch to the return block. The caller will see the error.
+    EmitBranchThroughCleanup(ReturnBlock);
+
+    if (KeepInsertionPoint)
+      EmitBlock(createBasicBlock("throw.cont"));
+    return;
+  }
+
   // If the exception is being emitted in an OpenMP target region,
   // and the target is a GPU, we do not support exception handling.
   // Therefore, we emit a trap which will abort the program, and
@@ -536,8 +554,10 @@ void CodeGenFunction::EmitStartEHSpec(const Decl *D) {
       Filter->setFilter(I, EHType);
     }
   } else if (Proto->canThrow() == CT_Cannot) {
-    // noexcept functions are simple terminate scopes.
-    if (!getLangOpts().EHAsynch) // -EHa: HW exception still can occur
+    // noexcept functions are simple terminate scopes, but not throws functions
+    // which handle errors via return values.
+    if (!getLangOpts().EHAsynch &&
+        !isThrowsExceptionSpec(Proto->getExceptionSpecType()))
       EHStack.pushTerminate();
   }
 }

@@ -233,13 +233,18 @@ static const CGFunctionInfo &
 arrangeLLVMFunctionInfo(CodeGenTypes &CGT, bool instanceMethod,
                         SmallVectorImpl<CanQualType> &prefix,
                         CanQual<FunctionProtoType> FTP) {
+  FnInfoOpts opts =
+      instanceMethod ? FnInfoOpts::IsInstanceMethod : FnInfoOpts::None;
+
+  if (!isUnresolvedExceptionSpec(FTP->getExceptionSpecType()) &&
+      FTP->getExceptionSpecificationComputeResult() == ESR_StaticExcept)
+    opts = opts | FnInfoOpts::IsStaticExceptionSpecification;
+
   ExtParameterInfoList paramInfos;
   RequiredArgs Required = RequiredArgs::forPrototypePlus(FTP, prefix.size());
   appendParameterTypes(CGT, prefix, paramInfos, FTP);
   CanQualType resultType = FTP->getReturnType().getUnqualifiedType();
 
-  FnInfoOpts opts =
-      instanceMethod ? FnInfoOpts::IsInstanceMethod : FnInfoOpts::None;
   return CGT.arrangeLLVMFunctionInfo(resultType, opts, prefix,
                                      FTP->getExtInfo(), paramInfos, Required);
 }
@@ -846,8 +851,12 @@ const CGFunctionInfo &CodeGenTypes::arrangeLLVMFunctionInfo(
       (opts & FnInfoOpts::IsChainCall) == FnInfoOpts::IsChainCall;
   bool isDelegateCall =
       (opts & FnInfoOpts::IsDelegateCall) == FnInfoOpts::IsDelegateCall;
+  bool isStaticExceptionSpec =
+      (opts & FnInfoOpts::IsStaticExceptionSpecification) ==
+      FnInfoOpts::IsStaticExceptionSpecification;
   CGFunctionInfo::Profile(ID, isInstanceMethod, isChainCall, isDelegateCall,
-                          info, paramInfos, required, resultType, argTypes);
+                          isStaticExceptionSpec, info, paramInfos, required,
+                          resultType, argTypes);
 
   void *insertPos = nullptr;
   CGFunctionInfo *FI = FunctionInfos.FindNodeOrInsertPos(ID, insertPos);
@@ -858,7 +867,8 @@ const CGFunctionInfo &CodeGenTypes::arrangeLLVMFunctionInfo(
 
   // Construct the function info.  We co-allocate the ArgInfos.
   FI = CGFunctionInfo::create(CC, isInstanceMethod, isChainCall, isDelegateCall,
-                              info, paramInfos, resultType, argTypes, required);
+                              isStaticExceptionSpec, info, paramInfos,
+                              resultType, argTypes, required);
   FunctionInfos.InsertNode(FI, insertPos);
 
   bool inserted = FunctionsBeingProcessed.insert(FI).second;
@@ -896,6 +906,7 @@ const CGFunctionInfo &CodeGenTypes::arrangeLLVMFunctionInfo(
 
 CGFunctionInfo *CGFunctionInfo::create(unsigned llvmCC, bool instanceMethod,
                                        bool chainCall, bool delegateCall,
+                                       bool staticExceptionSpec,
                                        const FunctionType::ExtInfo &info,
                                        ArrayRef<ExtParameterInfo> paramInfos,
                                        CanQualType resultType,
@@ -915,6 +926,7 @@ CGFunctionInfo *CGFunctionInfo::create(unsigned llvmCC, bool instanceMethod,
   FI->InstanceMethod = instanceMethod;
   FI->ChainCall = chainCall;
   FI->DelegateCall = delegateCall;
+  FI->StaticExceptionSpecification = staticExceptionSpec;
   FI->CmseNSCall = info.getCmseNSCall();
   FI->NoReturn = info.getNoReturn();
   FI->ReturnsRetained = info.getProducesResult();
@@ -1943,7 +1955,8 @@ static void AddAttributesFromFunctionProtoType(ASTContext &Ctx,
     return;
 
   if (!isUnresolvedExceptionSpec(FPT->getExceptionSpecType()) &&
-      FPT->isNothrow())
+      (FPT->isNothrow() ||
+       FPT->getExceptionSpecificationComputeResult() == ESR_StaticExcept))
     FuncAttrs.addAttribute(llvm::Attribute::NoUnwind);
 
   unsigned SMEBits = FPT->getAArch64SMEAttributes();

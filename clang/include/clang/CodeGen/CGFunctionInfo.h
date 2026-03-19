@@ -625,6 +625,10 @@ class CGFunctionInfo final
   LLVM_PREFERRED_TYPE(bool)
   unsigned DelegateCall : 1;
 
+  /// Whether this function uses a P0709 static exception specification.
+  LLVM_PREFERRED_TYPE(bool)
+  unsigned StaticExceptionSpecification : 1;
+
   /// Whether this function is a CMSE nonsecure call
   LLVM_PREFERRED_TYPE(bool)
   unsigned CmseNSCall : 1;
@@ -683,7 +687,8 @@ class CGFunctionInfo final
 public:
   static CGFunctionInfo *
   create(unsigned llvmCC, bool instanceMethod, bool chainCall,
-         bool delegateCall, const FunctionType::ExtInfo &extInfo,
+         bool delegateCall, bool staticExceptionSpec,
+         const FunctionType::ExtInfo &extInfo,
          ArrayRef<ExtParameterInfo> paramInfos, CanQualType resultType,
          ArrayRef<CanQualType> argTypes, RequiredArgs required);
   void operator delete(void *p) { ::operator delete(p); }
@@ -726,6 +731,10 @@ public:
   bool isChainCall() const { return ChainCall; }
 
   bool isDelegateCall() const { return DelegateCall; }
+
+  bool isStaticExceptionSpecification() const {
+    return StaticExceptionSpecification;
+  }
 
   bool isCmseNSCall() const { return CmseNSCall; }
 
@@ -814,6 +823,7 @@ public:
     ID.AddBoolean(InstanceMethod);
     ID.AddBoolean(ChainCall);
     ID.AddBoolean(DelegateCall);
+    ID.AddBoolean(StaticExceptionSpecification);
     ID.AddBoolean(NoReturn);
     ID.AddBoolean(ReturnsRetained);
     ID.AddBoolean(NoCallerSavedRegs);
@@ -833,6 +843,7 @@ public:
   }
   static void Profile(llvm::FoldingSetNodeID &ID, bool InstanceMethod,
                       bool ChainCall, bool IsDelegateCall,
+                      bool StaticExceptionSpec,
                       const FunctionType::ExtInfo &info,
                       ArrayRef<ExtParameterInfo> paramInfos,
                       RequiredArgs required, CanQualType resultType,
@@ -841,6 +852,7 @@ public:
     ID.AddBoolean(InstanceMethod);
     ID.AddBoolean(ChainCall);
     ID.AddBoolean(IsDelegateCall);
+    ID.AddBoolean(StaticExceptionSpec);
     ID.AddBoolean(info.getNoReturn());
     ID.AddBoolean(info.getProducesResult());
     ID.AddBoolean(info.getNoCallerSavedRegs());
