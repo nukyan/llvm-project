@@ -950,6 +950,14 @@ FunctionProtoType::printExceptionSpecification(raw_ostream &OS,
         getNoexceptExpr()->printPretty(OS, nullptr, Policy);
       OS << ')';
     }
+  } else if (isThrowsExceptionSpec(getExceptionSpecType())) {
+    OS << " throws";
+    if (isComputedThrows(getExceptionSpecType())) {
+      OS << '(';
+      if (getThrowsExpr())
+        getThrowsExpr()->printPretty(OS, nullptr, Policy);
+      OS << ')';
+    }
   }
 }
 

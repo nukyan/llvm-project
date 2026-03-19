@@ -207,6 +207,8 @@ public:
       asImpl().writeArray(esi.Exceptions);
     } else if (isComputedNoexcept(esi.Type)) {
       asImpl().writeExprRef(esi.NoexceptExpr);
+    } else if (isComputedThrows(esi.Type)) {
+      asImpl().writeExprRef(esi.ThrowsExpr);
     } else if (esi.Type == EST_Uninstantiated) {
       asImpl().writeDeclRef(esi.SourceDecl);
       asImpl().writeDeclRef(esi.SourceTemplate);

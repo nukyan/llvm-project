@@ -181,6 +181,29 @@ DeclarationFragments DeclarationFragments::getExceptionSpecificationString(
         .append("(", DeclarationFragments::FragmentKind::Text)
         .append("true", DeclarationFragments::FragmentKind::Keyword)
         .append(")", DeclarationFragments::FragmentKind::Text);
+  case ExceptionSpecificationType::EST_BasicThrows:
+    return Fragments.append(" ", DeclarationFragments::FragmentKind::Text)
+        .append("throws", DeclarationFragments::FragmentKind::Keyword);
+  case ExceptionSpecificationType::EST_DependentThrows:
+    break;
+  case ExceptionSpecificationType::EST_ThrowsFalse:
+    return Fragments.append(" ", DeclarationFragments::FragmentKind::Text)
+        .append("throws", DeclarationFragments::FragmentKind::Keyword)
+        .append("(", DeclarationFragments::FragmentKind::Text)
+        .append("no_except", DeclarationFragments::FragmentKind::Keyword)
+        .append(")", DeclarationFragments::FragmentKind::Text);
+  case ExceptionSpecificationType::EST_ThrowsTrue:
+    return Fragments.append(" ", DeclarationFragments::FragmentKind::Text)
+        .append("throws", DeclarationFragments::FragmentKind::Keyword)
+        .append("(", DeclarationFragments::FragmentKind::Text)
+        .append("static_except", DeclarationFragments::FragmentKind::Keyword)
+        .append(")", DeclarationFragments::FragmentKind::Text);
+  case ExceptionSpecificationType::EST_ThrowsDynamic:
+    return Fragments.append(" ", DeclarationFragments::FragmentKind::Text)
+        .append("throws", DeclarationFragments::FragmentKind::Keyword)
+        .append("(", DeclarationFragments::FragmentKind::Text)
+        .append("dynamic_except", DeclarationFragments::FragmentKind::Keyword)
+        .append(")", DeclarationFragments::FragmentKind::Text);
   default:
     return Fragments;
   }

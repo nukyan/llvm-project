@@ -226,6 +226,8 @@ public:
       esi.Exceptions = asImpl().template readArray<QualType>(buffer);
     } else if (isComputedNoexcept(esi.Type)) {
       esi.NoexceptExpr = asImpl().readExprRef();
+    } else if (isComputedThrows(esi.Type)) {
+      esi.ThrowsExpr = asImpl().readExprRef();
     } else if (esi.Type == EST_Uninstantiated) {
       esi.SourceDecl = asImpl().readFunctionDeclRef();
       esi.SourceTemplate = asImpl().readFunctionDeclRef();
