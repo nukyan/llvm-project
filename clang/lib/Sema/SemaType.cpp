@@ -808,6 +808,7 @@ static void maybeSynthesizeBlockSignature(TypeProcessingState &state,
       /*ExceptionRanges=*/nullptr,
       /*NumExceptions=*/0,
       /*NoexceptExpr=*/nullptr,
+      /*ThrowsExpr=*/nullptr,
       /*ExceptionSpecTokens=*/nullptr,
       /*DeclsInPrototype=*/{}, loc, loc, declarator));
 

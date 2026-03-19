@@ -526,24 +526,24 @@ void Parser::ParseLexedMethodDeclaration(LateParsedMethodDeclaration &LM) {
     SmallVector<ParsedType, 4> DynamicExceptions;
     SmallVector<SourceRange, 4> DynamicExceptionRanges;
     ExprResult NoexceptExpr;
+    ExprResult ThrowsExpr;
     CachedTokens *ExceptionSpecTokens;
 
     ExceptionSpecificationType EST
       = tryParseExceptionSpecification(/*Delayed=*/false, SpecificationRange,
                                        DynamicExceptions,
                                        DynamicExceptionRanges, NoexceptExpr,
-                                       ExceptionSpecTokens);
+                                       ThrowsExpr, ExceptionSpecTokens);
 
     if (Tok.isNot(tok::eof) || Tok.getEofData() != LM.Method)
       Diag(Tok.getLocation(), diag::err_except_spec_unparsed);
 
     // Attach the exception-specification to the method.
-    Actions.actOnDelayedExceptionSpecification(LM.Method, EST,
-                                               SpecificationRange,
-                                               DynamicExceptions,
-                                               DynamicExceptionRanges,
-                                               NoexceptExpr.isUsable()?
-                                                 NoexceptExpr.get() : nullptr);
+    Actions.actOnDelayedExceptionSpecification(
+        LM.Method, EST, SpecificationRange, DynamicExceptions,
+        DynamicExceptionRanges,
+        NoexceptExpr.isUsable() ? NoexceptExpr.get() : nullptr,
+        ThrowsExpr.isUsable() ? ThrowsExpr.get() : nullptr);
 
     // There could be leftover tokens (e.g. because of an error).
     // Skip through until we reach the original token position.
