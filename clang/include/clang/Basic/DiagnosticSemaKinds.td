@@ -8530,6 +8530,11 @@ def err_bad_dynamic_cast_not_polymorphic : Error<"%0 is not polymorphic">;
 // Other C++ expressions
 def err_need_header_before_typeid : Error<
   "you need to include <typeinfo>%select{| or import std}0 before using the 'typeid' operator">;
+def err_need_header_before_throws_specifier : Error<
+  "you need to include <stderror> before using the 'throws' specifier">;
+def err_throws_expression_value_out_of_range : Error<
+  "invalid throws expression value %0; expected one of: no_except"
+  ", static_except, or dynamic_except (see std::except_t)">;
 def err_need_header_before_placement_new : Error<
   "no matching %0 function for non-allocating placement new expression; "
   "include <new>">;

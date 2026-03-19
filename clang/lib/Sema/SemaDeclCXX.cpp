@@ -226,6 +226,14 @@ Sema::ImplicitExceptionSpecification::CalledDecl(SourceLocation CallLoc,
   case EST_BasicNoexcept:
   case EST_NoexceptTrue:
   case EST_NoThrow:
+  case EST_ThrowsFalse:
+    return;
+  case EST_BasicThrows:
+  case EST_ThrowsTrue:
+    return;
+  case EST_ThrowsDynamic:
+    ClearExceptions();
+    ComputedEST = EST_None;
     return;
   // If we're still at noexcept(true) and there's a throw() callee,
   // change to that specification.
@@ -234,6 +242,7 @@ Sema::ImplicitExceptionSpecification::CalledDecl(SourceLocation CallLoc,
       ComputedEST = EST_DynamicNone;
     return;
   case EST_DependentNoexcept:
+  case EST_DependentThrows:
     llvm_unreachable(
         "should not generate implicit declarations for dependent cases");
   case EST_Dynamic:
@@ -19518,7 +19527,7 @@ void Sema::checkExceptionSpecification(
     bool IsTopLevel, ExceptionSpecificationType EST,
     ArrayRef<ParsedType> DynamicExceptions,
     ArrayRef<SourceRange> DynamicExceptionRanges, Expr *NoexceptExpr,
-    SmallVectorImpl<QualType> &Exceptions,
+    Expr *ThrowsExpr, SmallVectorImpl<QualType> &Exceptions,
     FunctionProtoType::ExceptionSpecInfo &ESI) {
   Exceptions.clear();
   ESI.Type = EST;
@@ -19561,12 +19570,23 @@ void Sema::checkExceptionSpecification(
     ESI.NoexceptExpr = NoexceptExpr;
     return;
   }
+
+  if (isComputedThrows(EST)) {
+    assert(ThrowsExpr && "computed throws with no expr");
+    if (IsTopLevel && DiagnoseUnexpandedParameterPack(ThrowsExpr)) {
+      ESI.Type = EST_BasicThrows;
+      return;
+    }
+    ESI.ThrowsExpr = ThrowsExpr;
+    return;
+  }
 }
 
 void Sema::actOnDelayedExceptionSpecification(
     Decl *D, ExceptionSpecificationType EST, SourceRange SpecificationRange,
     ArrayRef<ParsedType> DynamicExceptions,
-    ArrayRef<SourceRange> DynamicExceptionRanges, Expr *NoexceptExpr) {
+    ArrayRef<SourceRange> DynamicExceptionRanges, Expr *NoexceptExpr,
+    Expr *ThrowsExpr) {
   if (!D)
     return;
 
@@ -19582,8 +19602,8 @@ void Sema::actOnDelayedExceptionSpecification(
   llvm::SmallVector<QualType, 4> Exceptions;
   FunctionProtoType::ExceptionSpecInfo ESI;
   checkExceptionSpecification(/*IsTopLevel=*/true, EST, DynamicExceptions,
-                              DynamicExceptionRanges, NoexceptExpr, Exceptions,
-                              ESI);
+                              DynamicExceptionRanges, NoexceptExpr, ThrowsExpr,
+                              Exceptions, ESI);
 
   // Update the exception specification on the function type.
   Context.adjustExceptionSpec(FD, ESI, /*AsWritten=*/true);

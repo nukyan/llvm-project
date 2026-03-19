@@ -844,6 +844,7 @@ enum class CCEKind {
   ArrayBound,    ///< Array bound in array declarator or new-expression.
   ExplicitBool,  ///< Condition in an explicit(bool) specifier.
   Noexcept,      ///< Condition in a noexcept(bool) specifier.
+  Throws,        ///< Condition in a throws(except_t) specifier.
   StaticAssertMessageSize, ///< Call to size() in a static assert
                            ///< message.
   StaticAssertMessageData, ///< Call to data() in a static assert
@@ -5579,7 +5580,7 @@ public:
                                    ExceptionSpecificationType EST,
                                    ArrayRef<ParsedType> DynamicExceptions,
                                    ArrayRef<SourceRange> DynamicExceptionRanges,
-                                   Expr *NoexceptExpr,
+                                   Expr *NoexceptExpr, Expr *ThrowsExpr,
                                    SmallVectorImpl<QualType> &Exceptions,
                                    FunctionProtoType::ExceptionSpecInfo &ESI);
 
@@ -5589,7 +5590,8 @@ public:
   void actOnDelayedExceptionSpecification(
       Decl *D, ExceptionSpecificationType EST, SourceRange SpecificationRange,
       ArrayRef<ParsedType> DynamicExceptions,
-      ArrayRef<SourceRange> DynamicExceptionRanges, Expr *NoexceptExpr);
+      ArrayRef<SourceRange> DynamicExceptionRanges, Expr *NoexceptExpr,
+      Expr *ThrowsExpr);
 
   class InheritedConstructorInfo;
 
@@ -6668,6 +6670,14 @@ public:
   /// the appropriate ExceptionSpecificationType.
   ExprResult ActOnNoexceptSpec(Expr *NoexceptExpr,
                                ExceptionSpecificationType &EST);
+
+  /// Look up std::error for the throws specifier.
+  void ActOnThrowsSpec(SourceLocation ThrowsLoc);
+
+  /// Check the given throws-specifier expression and compute the
+  /// appropriate ExceptionSpecificationType.
+  ExprResult ActOnThrowsSpecExpr(Expr *ThrowsExpr,
+                                 ExceptionSpecificationType &EST);
 
   CanThrowResult canThrow(const Stmt *E);
   /// Determine whether the callee of a particular function call can throw.

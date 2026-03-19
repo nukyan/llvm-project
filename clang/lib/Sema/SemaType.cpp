@@ -5365,6 +5365,7 @@ static TypeSourceInfo *GetFullTypeForDeclarator(TypeProcessingState &state,
         SmallVector<ParsedType, 2> DynamicExceptions;
         SmallVector<SourceRange, 2> DynamicExceptionRanges;
         Expr *NoexceptExpr = nullptr;
+        Expr *ThrowsExpr = nullptr;
 
         if (FTI.getExceptionSpecType() == EST_Dynamic) {
           // FIXME: It's rather inefficient to have to split into two vectors
@@ -5378,13 +5379,15 @@ static TypeSourceInfo *GetFullTypeForDeclarator(TypeProcessingState &state,
           }
         } else if (isComputedNoexcept(FTI.getExceptionSpecType())) {
           NoexceptExpr = FTI.NoexceptExpr;
+        } else if (isComputedThrows(FTI.getExceptionSpecType())) {
+          ThrowsExpr = FTI.ThrowsExpr;
         }
 
         S.checkExceptionSpecification(D.isFunctionDeclarationContext(),
                                       FTI.getExceptionSpecType(),
                                       DynamicExceptions,
                                       DynamicExceptionRanges,
-                                      NoexceptExpr,
+                                      NoexceptExpr, ThrowsExpr,
                                       Exceptions,
                                       EPI.ExceptionSpec);
 

@@ -115,6 +115,89 @@ ExprResult Sema::ActOnNoexceptSpec(Expr *NoexceptExpr,
   return Converted;
 }
 
+void Sema::ActOnThrowsSpec(SourceLocation ThrowsLoc) {
+  if (!getStdNamespace()) {
+    Diag(ThrowsLoc, diag::err_need_header_before_throws_specifier);
+    return;
+  }
+  if (!Context.CXXStdErrorDecl) {
+    IdentifierInfo *ErrorII = &PP.getIdentifierTable().get("error");
+    LookupResult R(*this, ErrorII, SourceLocation(), LookupTagName);
+    LookupQualifiedName(R, getStdNamespace());
+    Context.CXXStdErrorDecl = R.getAsSingle<RecordDecl>();
+    if (!Context.CXXStdErrorDecl)
+      Diag(ThrowsLoc, diag::err_need_header_before_throws_specifier);
+  }
+}
+
+ExprResult Sema::ActOnThrowsSpecExpr(Expr *ThrowsExpr,
+                                     ExceptionSpecificationType &EST) {
+  if (ThrowsExpr->isTypeDependent() ||
+      ThrowsExpr->containsUnexpandedParameterPack()) {
+    EST = EST_DependentThrows;
+    return ThrowsExpr;
+  }
+
+  // Look up std::except_t if we haven't already.
+  if (!Context.CXXExceptTDecl) {
+    if (getStdNamespace()) {
+      IdentifierInfo *ExceptTII = &PP.getIdentifierTable().get("except_t");
+      LookupResult R(*this, ExceptTII, SourceLocation(), LookupTagName);
+      LookupQualifiedName(R, getStdNamespace());
+      Context.CXXExceptTDecl = R.getAsSingle<EnumDecl>();
+    }
+  }
+
+  QualType TargetType;
+  if (Context.CXXExceptTDecl)
+    TargetType = Context.getTypeDeclType(Context.CXXExceptTDecl);
+  else
+    TargetType = Context.IntTy;
+
+  llvm::APSInt Result;
+  ExprResult Converted = CheckConvertedConstantExpression(
+      ThrowsExpr, TargetType, Result, CCEKind::Throws);
+
+  if (Converted.isInvalid()) {
+    EST = EST_ThrowsFalse;
+    auto *ZeroExpr = new (Context) IntegerLiteral(
+        Context, llvm::APSInt::get(0), TargetType,
+        ThrowsExpr->getBeginLoc());
+    llvm::APSInt Value{2};
+    Value = 0;
+    return ConstantExpr::Create(Context, ZeroExpr, APValue{Value});
+  }
+
+  if (Result < 0 || Result > 2) {
+    EST = EST_ThrowsFalse;
+    Diag(ThrowsExpr->getBeginLoc(),
+         diag::err_throws_expression_value_out_of_range)
+        << Result.getExtValue();
+    auto *ZeroExpr = new (Context) IntegerLiteral(
+        Context, llvm::APSInt::get(0), TargetType,
+        ThrowsExpr->getBeginLoc());
+    llvm::APSInt Value{2};
+    Value = 0;
+    return ConstantExpr::Create(Context, ZeroExpr, APValue{Value});
+  }
+
+  if (Converted.get()->isValueDependent()) {
+    EST = EST_DependentThrows;
+    return Converted;
+  }
+
+  if (Result == 0)
+    EST = EST_ThrowsFalse;
+  else if (Result == 1)
+    EST = EST_ThrowsTrue;
+  else if (Result == 2)
+    EST = EST_ThrowsDynamic;
+  else
+    llvm_unreachable("unexpected throws expression result");
+
+  return Converted;
+}
+
 bool Sema::CheckSpecifiedExceptionType(QualType &T, SourceRange Range) {
   // C++11 [except.spec]p2:
   //   A type cv T, "array of T", or "function returning T" denoted
