@@ -2307,6 +2307,11 @@ defm assume_nothrow_exception_dtor: BoolFOption<"assume-nothrow-exception-dtor",
   LangOpts<"AssumeNothrowExceptionDtor">, DefaultFalse,
   PosFlag<SetTrue, [], [ClangOption, CC1Option], "Assume that exception objects' destructors are non-throwing">,
   NegFlag<SetFalse>>;
+defm static_exceptions: BoolFOption<"static-exceptions",
+  LangOpts<"StaticExceptions">, DefaultFalse,
+  PosFlag<SetTrue, [], [ClangOption, CC1Option],
+          "Enable static exception specifications (P0709 throws)">,
+  NegFlag<SetFalse>>;
 def winx64_eh_unwindv2
     : Joined<["-"], "fwinx64-eh-unwindv2=">, Group<f_Group>,
     Visibility<[ClangOption, CC1Option]>,
