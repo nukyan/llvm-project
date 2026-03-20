@@ -445,35 +445,20 @@ llvm::Value *CodeGenFunction::getSelectorFromSlot() {
 
 void CodeGenFunction::EmitCXXThrowExpr(const CXXThrowExpr *E,
                                        bool KeepInsertionPoint) {
-  // P0709 static exception specification: throw stores the error and
-  // branches to the return block rather than unwinding.
-  if (CurFnInfo && CurFnInfo->isStaticExceptionSpecification()) {
+  if (CurFnInfo->isStaticExceptionSpecification()) {
     // TODO(P0709): store the error into the return aggregate and branch to
-    // the return block. For now we evaluate the operand for side-effects and
-    // trap, so that incomplete codegen is not silently miscompiled.
+    // the return block. For now we evaluate the operand for side-effects
+    // and trap so incomplete codegen is not silently miscompiled.
     if (const Expr *SubExpr = E->getSubExpr())
       EmitAnyExpr(SubExpr);
     EmitTrapCall(llvm::Intrinsic::trap);
-
-    if (KeepInsertionPoint)
-      EmitBlock(createBasicBlock("throw.cont"));
-    return;
-  }
-
-  // If the exception is being emitted in an OpenMP target region,
-  // and the target is a GPU, we do not support exception handling.
-  // Therefore, we emit a trap which will abort the program, and
-  // prompt a warning indicating that a trap will be emitted.
-  const llvm::Triple &T = Target.getTriple();
-  if (CGM.getLangOpts().OpenMPIsTargetDevice && T.isGPU()) {
+  } else if (CGM.getLangOpts().OpenMPIsTargetDevice &&
+             Target.getTriple().isGPU()) {
     EmitTrapCall(llvm::Intrinsic::trap);
-    return;
-  }
-  if (const Expr *SubExpr = E->getSubExpr()) {
-    QualType ThrowType = SubExpr->getType();
-    if (ThrowType->isObjCObjectPointerType()) {
-      const Stmt *ThrowStmt = E->getSubExpr();
-      const ObjCAtThrowStmt S(E->getExprLoc(), const_cast<Stmt *>(ThrowStmt));
+  } else if (const Expr *SubExpr = E->getSubExpr()) {
+    if (SubExpr->getType()->isObjCObjectPointerType()) {
+      const ObjCAtThrowStmt S(E->getExprLoc(),
+                              const_cast<Stmt *>(cast<Stmt>(SubExpr)));
       CGM.getObjCRuntime().EmitThrowStmt(*this, S, false);
     } else {
       CGM.getCXXABI().emitThrow(*this, E);
@@ -554,7 +539,7 @@ void CodeGenFunction::EmitStartEHSpec(const Decl *D) {
     // noexcept functions are simple terminate scopes, but not throws functions
     // which handle errors via return values.
     if (!getLangOpts().EHAsynch &&
-        !isThrowsExceptionSpec(Proto->getExceptionSpecType()))
+        !isStaticExceptionSpec(Proto->getExceptionSpecType()))
       EHStack.pushTerminate();
   }
 }

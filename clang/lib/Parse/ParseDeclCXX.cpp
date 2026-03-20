@@ -3914,7 +3914,6 @@ ExceptionSpecificationType Parser::tryParseExceptionSpecification(
     SmallVectorImpl<SourceRange> &DynamicExceptionRanges,
     ExprResult &NoexceptExpr, ExprResult &ThrowsExpr,
     CachedTokens *&ExceptionSpecTokens) {
-  ExceptionSpecificationType Result = EST_None;
   ExceptionSpecTokens = nullptr;
 
   // Handle delayed parsing of exception-specifications.
@@ -3923,14 +3922,12 @@ ExceptionSpecificationType Parser::tryParseExceptionSpecification(
         !(getLangOpts().Herbception && Tok.is(tok::kw_throws)))
       return EST_None;
 
-    // Consume and cache the starting token.
     bool IsNoexcept = Tok.is(tok::kw_noexcept);
     bool IsThrows = Tok.is(tok::kw_throws);
     Token StartTok = Tok;
     SpecificationRange = SourceRange(ConsumeToken());
 
-    // Check for a '('.
-    if (!Tok.is(tok::l_paren)) {
+    if (Tok.isNot(tok::l_paren)) {
       if (IsNoexcept) {
         Diag(Tok, diag::warn_cxx98_compat_noexcept_decl);
         NoexceptExpr = nullptr;
@@ -3938,26 +3935,23 @@ ExceptionSpecificationType Parser::tryParseExceptionSpecification(
       }
       if (IsThrows)
         return EST_BasicThrows;
-
       Diag(Tok, diag::err_expected_lparen_after) << "throw";
       return EST_DynamicNone;
     }
 
-    // Cache the tokens for the exception-specification.
     ExceptionSpecTokens = new CachedTokens;
     ExceptionSpecTokens->push_back(StartTok);
     ExceptionSpecTokens->push_back(Tok);
     SpecificationRange.setEnd(ConsumeParen());
-
     ConsumeAndStoreUntil(tok::r_paren, *ExceptionSpecTokens,
-                         /*StopAtSemi=*/true,
-                         /*ConsumeFinalToken=*/true);
+                         /*StopAtSemi=*/true, /*ConsumeFinalToken=*/true);
     SpecificationRange.setEnd(ExceptionSpecTokens->back().getLocation());
-
     return EST_Unparsed;
   }
 
-  // See if there's a dynamic specification.
+  // Non-delayed: parse each specifier kind in order of precedence.
+  ExceptionSpecificationType Result = EST_None;
+
   if (Tok.is(tok::kw_throw)) {
     Result = ParseDynamicExceptionSpecification(
         SpecificationRange, DynamicExceptions, DynamicExceptionRanges);
@@ -3965,90 +3959,78 @@ ExceptionSpecificationType Parser::tryParseExceptionSpecification(
            "Produced different number of exception types and ranges.");
   }
 
-  // Parse noexcept specification if present.
   if (Tok.is(tok::kw_noexcept)) {
-    Diag(Tok, diag::warn_cxx98_compat_noexcept_decl);
-
-    SourceRange NoexceptRange;
-    ExceptionSpecificationType NoexceptType = EST_None;
-
-    SourceLocation KeywordLoc = ConsumeToken();
-    if (Tok.is(tok::l_paren)) {
-      BalancedDelimiterTracker T(*this, tok::l_paren);
-      T.consumeOpen();
-      EnterExpressionEvaluationContext ConstantEvaluated(
-          Actions, Sema::ExpressionEvaluationContext::ConstantEvaluated);
-      NoexceptExpr = ParseConstantExpressionInExprEvalContext();
-      T.consumeClose();
-      if (!NoexceptExpr.isInvalid()) {
-        NoexceptExpr =
-            Actions.ActOnNoexceptSpec(NoexceptExpr.get(), NoexceptType);
-        NoexceptRange = SourceRange(KeywordLoc, T.getCloseLocation());
-      } else {
-        NoexceptType = EST_BasicNoexcept;
-      }
-    } else {
-      NoexceptType = EST_BasicNoexcept;
-      NoexceptRange = SourceRange(KeywordLoc, KeywordLoc);
-    }
-
-    if (Result == EST_None) {
-      SpecificationRange = NoexceptRange;
-      Result = NoexceptType;
-      if (Tok.is(tok::kw_throw)) {
-        Diag(Tok.getLocation(), diag::err_dynamic_and_noexcept_specification);
-        ParseDynamicExceptionSpecification(NoexceptRange, DynamicExceptions,
-                                           DynamicExceptionRanges);
-      }
-      if (getLangOpts().Herbception && Tok.is(tok::kw_throws))
-        Diag(Tok.getLocation(), diag::err_dynamic_and_noexcept_specification);
-    } else {
+    if (Result != EST_None)
       Diag(Tok.getLocation(), diag::err_dynamic_and_noexcept_specification);
+
+    Diag(Tok, diag::warn_cxx98_compat_noexcept_decl);
+    ExceptionSpecificationType NoexceptType = ParseThrowsSpecification(
+        SpecificationRange, NoexceptExpr, EST_BasicNoexcept,
+        [this](Expr *E, ExceptionSpecificationType &T) {
+          return Actions.ActOnNoexceptSpec(E, T);
+        });
+    if (Result == EST_None)
+      Result = NoexceptType;
+
+    // Diagnose and skip conflicting trailing specs for recovery.
+    if (Tok.is(tok::kw_throw)) {
+      Diag(Tok.getLocation(), diag::err_dynamic_and_noexcept_specification);
+      SourceRange IgnoredRange;
+      ParseDynamicExceptionSpecification(IgnoredRange, DynamicExceptions,
+                                         DynamicExceptionRanges);
     }
+    if (getLangOpts().Herbception && Tok.is(tok::kw_throws))
+      Diag(Tok.getLocation(), diag::err_dynamic_and_noexcept_specification);
+
     return Result;
   }
 
-  // Parse P0709 throws specification if enabled and present.
   if (getLangOpts().Herbception && Tok.is(tok::kw_throws)) {
     if (Result != EST_None)
       Diag(Tok.getLocation(), diag::err_dynamic_and_noexcept_specification);
-    else
-      Result = ParseThrowsSpecification(SpecificationRange, ThrowsExpr);
+
+    ExceptionSpecificationType ThrowsType = ParseThrowsSpecification(
+        SpecificationRange, ThrowsExpr, EST_BasicThrows,
+        [this](Expr *E, ExceptionSpecificationType &T) {
+          return Actions.ActOnThrowsSpecExpr(E, T);
+        });
+    if (Result == EST_None)
+      Result = ThrowsType;
   }
 
   return Result;
 }
 
-ExceptionSpecificationType
-Parser::ParseThrowsSpecification(SourceRange &SpecificationRange,
-                                 ExprResult &ThrowsExpr) {
-  assert(Tok.is(tok::kw_throws) && "expected throws");
-
-  Actions.ActOnThrowsSpec(Tok.getLocation());
+ExceptionSpecificationType Parser::ParseThrowsSpecification(
+    SourceRange &SpecificationRange, ExprResult &ExprOut,
+    ExceptionSpecificationType DefaultEST,
+    llvm::function_ref<ExprResult(Expr *, ExceptionSpecificationType &)>
+        ActOnExpr) {
+  if (DefaultEST == EST_BasicThrows)
+    Actions.ActOnThrowsSpec(Tok.getLocation());
 
   SourceLocation KeywordLoc = ConsumeToken();
-
-  if (Tok.is(tok::l_paren)) {
-    BalancedDelimiterTracker T(*this, tok::l_paren);
-    T.consumeOpen();
-
-    EnterExpressionEvaluationContext ConstantEvaluated(
-        Actions, Sema::ExpressionEvaluationContext::ConstantEvaluated);
-    ThrowsExpr = ParseConstantExpressionInExprEvalContext();
-
-    T.consumeClose();
-    if (!ThrowsExpr.isInvalid()) {
-      ExceptionSpecificationType EST = EST_BasicThrows;
-      ThrowsExpr = Actions.ActOnThrowsSpecExpr(ThrowsExpr.get(), EST);
-      SpecificationRange = SourceRange(KeywordLoc, T.getCloseLocation());
-      return EST;
-    }
-    SpecificationRange = SourceRange(KeywordLoc, T.getCloseLocation());
-    return EST_BasicThrows;
-  }
-
   SpecificationRange = SourceRange(KeywordLoc, KeywordLoc);
-  return EST_BasicThrows;
+
+  if (Tok.isNot(tok::l_paren))
+    return DefaultEST;
+
+  BalancedDelimiterTracker T(*this, tok::l_paren);
+  T.consumeOpen();
+
+  EnterExpressionEvaluationContext ConstantEvaluated(
+      Actions, Sema::ExpressionEvaluationContext::ConstantEvaluated);
+  ExprOut = ParseConstantExpressionInExprEvalContext();
+
+  T.consumeClose();
+  SpecificationRange = SourceRange(KeywordLoc, T.getCloseLocation());
+
+  if (ExprOut.isInvalid())
+    return DefaultEST;
+
+  ExceptionSpecificationType EST = DefaultEST;
+  ExprOut = ActOnExpr(ExprOut.get(), EST);
+  return EST;
 }
 
 static void diagnoseDynamicExceptionSpecification(Parser &P, SourceRange Range,

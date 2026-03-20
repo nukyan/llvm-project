@@ -14195,16 +14195,16 @@ ASTContext::mergeExceptionSpecs(FunctionProtoType::ExceptionSpecInfo ESI1,
                                 bool AcceptDependent) const {
   ExceptionSpecificationType EST1 = ESI1.Type, EST2 = ESI2.Type;
 
-  // If either uses static exceptions (P0709 throws), that wins.
-  for (auto I : {EST_BasicThrows, EST_ThrowsTrue}) {
+  // If either of them can throw anything dynamically, that is the result.
+  for (auto I : {EST_None, EST_MSAny, EST_NoexceptFalse, EST_ThrowsDynamic}) {
     if (EST1 == I)
       return ESI1;
     if (EST2 == I)
       return ESI2;
   }
 
-  // If either of them can throw anything, that is the result.
-  for (auto I : {EST_None, EST_MSAny, EST_NoexceptFalse, EST_ThrowsDynamic}) {
+  // If either uses P0709 static exceptions, that wins over non-throwing.
+  for (auto I : {EST_BasicThrows, EST_ThrowsTrue}) {
     if (EST1 == I)
       return ESI1;
     if (EST2 == I)

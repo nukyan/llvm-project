@@ -116,15 +116,13 @@ ExprResult Sema::ActOnNoexceptSpec(Expr *NoexceptExpr,
 }
 
 void Sema::ActOnThrowsSpec(SourceLocation ThrowsLoc) {
-  if (!getStdNamespace()) {
-    Diag(ThrowsLoc, diag::err_need_header_before_throws_specifier);
-    return;
-  }
   if (!Context.CXXStdErrorDecl) {
-    IdentifierInfo *ErrorII = &PP.getIdentifierTable().get("error");
-    LookupResult R(*this, ErrorII, SourceLocation(), LookupTagName);
-    LookupQualifiedName(R, getStdNamespace());
-    Context.CXXStdErrorDecl = R.getAsSingle<RecordDecl>();
+    if (auto *NS = getStdNamespace()) {
+      IdentifierInfo *ErrorII = &PP.getIdentifierTable().get("error");
+      LookupResult R(*this, ErrorII, SourceLocation(), LookupOrdinaryName);
+      LookupQualifiedName(R, NS);
+      Context.CXXStdErrorDecl = R.getAsSingle<TypeDecl>();
+    }
     if (!Context.CXXStdErrorDecl)
       Diag(ThrowsLoc, diag::err_need_header_before_throws_specifier);
   }
@@ -139,13 +137,11 @@ ExprResult Sema::ActOnThrowsSpecExpr(Expr *ThrowsExpr,
   }
 
   // Look up std::except_t if we haven't already.
-  if (!Context.CXXExceptTDecl) {
-    if (getStdNamespace()) {
-      IdentifierInfo *ExceptTII = &PP.getIdentifierTable().get("except_t");
-      LookupResult R(*this, ExceptTII, SourceLocation(), LookupTagName);
-      LookupQualifiedName(R, getStdNamespace());
-      Context.CXXExceptTDecl = R.getAsSingle<EnumDecl>();
-    }
+  if (!Context.CXXExceptTDecl && getStdNamespace()) {
+    IdentifierInfo *ExceptTII = &PP.getIdentifierTable().get("except_t");
+    LookupResult R(*this, ExceptTII, SourceLocation(), LookupTagName);
+    LookupQualifiedName(R, getStdNamespace());
+    Context.CXXExceptTDecl = R.getAsSingle<EnumDecl>();
   }
 
   QualType TargetType = Context.CXXExceptTDecl

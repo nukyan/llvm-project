@@ -2919,10 +2919,15 @@ private:
       ExprResult &NoexceptExpr, ExprResult &ThrowsExpr,
       CachedTokens *&ExceptionSpecTokens);
 
-  /// Parse a P0709 throws-specification.
-  ExceptionSpecificationType
-  ParseThrowsSpecification(SourceRange &SpecificationRange,
-                           ExprResult &ThrowsExpr);
+  /// Parse a noexcept or throws specification after the keyword has been
+  /// identified. The keyword is consumed, and if followed by '(expr)', the
+  /// expression is parsed and passed to ActOnExpr. DefaultEST is returned
+  /// when there is no parenthesised expression.
+  ExceptionSpecificationType ParseThrowsSpecification(
+      SourceRange &SpecificationRange, ExprResult &ExprOut,
+      ExceptionSpecificationType DefaultEST,
+      llvm::function_ref<ExprResult(Expr *, ExceptionSpecificationType &)>
+          ActOnExpr);
 
   /// ParseDynamicExceptionSpecification - Parse a C++
   /// dynamic-exception-specification (C++ [except.spec]).

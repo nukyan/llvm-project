@@ -1285,7 +1285,7 @@ public:
   ExternCContextDecl *getExternCContextDecl() const;
 
   /// Cached declarations for P0709 static exception specifications.
-  RecordDecl *CXXStdErrorDecl = nullptr;
+  TypeDecl *CXXStdErrorDecl = nullptr;
   EnumDecl *CXXExceptTDecl = nullptr;
 
 #define BuiltinTemplate(BTName) BuiltinTemplateDecl *get##BTName##Decl() const;
