@@ -152,25 +152,22 @@ ExprResult Sema::ActOnThrowsSpecExpr(Expr *ThrowsExpr,
                             ? Context.getTypeDeclType(Context.CXXExceptTDecl)
                             : Context.IntTy;
 
-  auto MakeZeroFallback = [&]() -> ExprResult {
-    EST = EST_ThrowsFalse;
-    auto *Lit = new (Context) IntegerLiteral(
-        Context, llvm::APSInt::get(0), TargetType, ThrowsExpr->getBeginLoc());
-    return ConstantExpr::Create(Context, Lit, APValue(llvm::APSInt::get(0)));
-  };
-
   llvm::APSInt Result;
   ExprResult Converted = CheckConvertedConstantExpression(
       ThrowsExpr, TargetType, Result, CCEKind::Throws);
 
-  if (Converted.isInvalid())
-    return MakeZeroFallback();
-
-  if (Result < 0 || Result > 2) {
+  if (!Converted.isInvalid() && (Result < 0 || Result > 2)) {
     Diag(ThrowsExpr->getBeginLoc(),
          diag::err_throws_expression_value_out_of_range)
         << Result.getExtValue();
-    return MakeZeroFallback();
+    Converted = ExprError();
+  }
+
+  if (Converted.isInvalid()) {
+    EST = EST_ThrowsFalse;
+    auto *Lit = new (Context) IntegerLiteral(
+        Context, llvm::APSInt::get(0), TargetType, ThrowsExpr->getBeginLoc());
+    return ConstantExpr::Create(Context, Lit, APValue(llvm::APSInt::get(0)));
   }
 
   if (Converted.get()->isValueDependent()) {
@@ -179,9 +176,15 @@ ExprResult Sema::ActOnThrowsSpecExpr(Expr *ThrowsExpr,
   }
 
   switch (Result.getExtValue()) {
-  case 0: EST = EST_ThrowsFalse; break;
-  case 1: EST = EST_ThrowsTrue; break;
-  case 2: EST = EST_ThrowsDynamic; break;
+  case 0:
+    EST = EST_ThrowsFalse;
+    break;
+  case 1:
+    EST = EST_ThrowsTrue;
+    break;
+  case 2:
+    EST = EST_ThrowsDynamic;
+    break;
   }
   return Converted;
 }

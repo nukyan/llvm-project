@@ -59,6 +59,10 @@ inline bool isThrowsExceptionSpec(ExceptionSpecificationType ESpecType) {
   return ESpecType == EST_BasicThrows || isComputedThrows(ESpecType);
 }
 
+inline bool isStaticExceptionSpec(ExceptionSpecificationType ESpecType) {
+  return ESpecType == EST_BasicThrows || ESpecType == EST_ThrowsTrue;
+}
+
 inline bool isUnresolvedExceptionSpec(ExceptionSpecificationType ESpecType) {
   return ESpecType == EST_Unevaluated || ESpecType == EST_Uninstantiated;
 }
@@ -80,14 +84,6 @@ inline CanThrowResult mergeCanThrow(CanThrowResult CT1, CanThrowResult CT2) {
   // merge result.
   return CT1 > CT2 ? CT1 : CT2;
 }
-
-/// Summarized exception specification result for codegen purposes.
-enum ExceptionSpecificationResult {
-  ESR_NoExcept,      ///< No exceptions can be thrown.
-  ESR_StaticExcept,  ///< Static exceptions can be thrown (P0709).
-  ESR_DynamicExcept, ///< Dynamic exceptions can be thrown.
-  ESR_Dependent,     ///< The exception specification is dependent.
-};
 
 } // end namespace clang
 

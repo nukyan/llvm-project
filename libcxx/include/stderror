@@ -22,7 +22,11 @@
 _LIBCPP_BEGIN_NAMESPACE_STD
 
 /// Tri-state value for throws(expr) specification.
-enum class except_t : unsigned char { no_except = 0, static_except = 1, dynamic_except = 2 };
+enum class except_t : unsigned char {
+  no_except      = 0, ///< Function does not throw.
+  static_except  = 1, ///< Function throws std::error (static exceptions).
+  dynamic_except = 2  ///< Function may throw dynamic exceptions.
+};
 
 // Forward declarations.
 template <class DomainType>

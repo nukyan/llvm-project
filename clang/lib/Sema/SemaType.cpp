@@ -5387,7 +5387,8 @@ static TypeSourceInfo *GetFullTypeForDeclarator(TypeProcessingState &state,
                                       FTI.getExceptionSpecType(),
                                       DynamicExceptions,
                                       DynamicExceptionRanges,
-                                      NoexceptExpr, ThrowsExpr,
+                                      NoexceptExpr,
+                                      ThrowsExpr,
                                       Exceptions,
                                       EPI.ExceptionSpec);
 

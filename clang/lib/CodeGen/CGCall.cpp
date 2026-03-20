@@ -236,8 +236,7 @@ arrangeLLVMFunctionInfo(CodeGenTypes &CGT, bool instanceMethod,
   FnInfoOpts opts =
       instanceMethod ? FnInfoOpts::IsInstanceMethod : FnInfoOpts::None;
 
-  if (!isUnresolvedExceptionSpec(FTP->getExceptionSpecType()) &&
-      FTP->getExceptionSpecificationComputeResult() == ESR_StaticExcept)
+  if (isStaticExceptionSpec(FTP->getExceptionSpecType()))
     opts = opts | FnInfoOpts::IsStaticExceptionSpecification;
 
   ExtParameterInfoList paramInfos;
@@ -1955,8 +1954,7 @@ static void AddAttributesFromFunctionProtoType(ASTContext &Ctx,
     return;
 
   if (!isUnresolvedExceptionSpec(FPT->getExceptionSpecType()) &&
-      (FPT->isNothrow() ||
-       FPT->getExceptionSpecificationComputeResult() == ESR_StaticExcept))
+      (FPT->isNothrow() || isStaticExceptionSpec(FPT->getExceptionSpecType())))
     FuncAttrs.addAttribute(llvm::Attribute::NoUnwind);
 
   unsigned SMEBits = FPT->getAArch64SMEAttributes();

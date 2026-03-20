@@ -5743,9 +5743,6 @@ public:
     return *getTrailingObjects<Expr *>();
   }
 
-  /// Compute a summarized exception specification result for codegen.
-  ExceptionSpecificationResult getExceptionSpecificationComputeResult() const;
-
   /// If this function type has an exception specification which hasn't
   /// been determined yet (either because it has not been evaluated or because
   /// it has not been instantiated), this is the function whose exception
