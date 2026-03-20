@@ -184,8 +184,6 @@ DeclarationFragments DeclarationFragments::getExceptionSpecificationString(
   case ExceptionSpecificationType::EST_BasicThrows:
     return Fragments.append(" ", DeclarationFragments::FragmentKind::Text)
         .append("throws", DeclarationFragments::FragmentKind::Keyword);
-  case ExceptionSpecificationType::EST_DependentThrows:
-    break;
   case ExceptionSpecificationType::EST_ThrowsFalse:
     return Fragments.append(" ", DeclarationFragments::FragmentKind::Text)
         .append("throws", DeclarationFragments::FragmentKind::Keyword)

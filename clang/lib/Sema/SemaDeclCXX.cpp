@@ -227,7 +227,6 @@ Sema::ImplicitExceptionSpecification::CalledDecl(SourceLocation CallLoc,
   case EST_NoexceptTrue:
   case EST_NoThrow:
   case EST_ThrowsFalse:
-    return;
   case EST_BasicThrows:
   case EST_ThrowsTrue:
     return;

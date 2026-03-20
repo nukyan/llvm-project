@@ -148,35 +148,29 @@ ExprResult Sema::ActOnThrowsSpecExpr(Expr *ThrowsExpr,
     }
   }
 
-  QualType TargetType;
-  if (Context.CXXExceptTDecl)
-    TargetType = Context.getTypeDeclType(Context.CXXExceptTDecl);
-  else
-    TargetType = Context.IntTy;
+  QualType TargetType = Context.CXXExceptTDecl
+                            ? Context.getTypeDeclType(Context.CXXExceptTDecl)
+                            : Context.IntTy;
+
+  auto MakeZeroFallback = [&]() -> ExprResult {
+    EST = EST_ThrowsFalse;
+    auto *Lit = new (Context) IntegerLiteral(
+        Context, llvm::APSInt::get(0), TargetType, ThrowsExpr->getBeginLoc());
+    return ConstantExpr::Create(Context, Lit, APValue(llvm::APSInt::get(0)));
+  };
 
   llvm::APSInt Result;
   ExprResult Converted = CheckConvertedConstantExpression(
       ThrowsExpr, TargetType, Result, CCEKind::Throws);
 
-  if (Converted.isInvalid()) {
-    EST = EST_ThrowsFalse;
-    auto *ZeroExpr = new (Context) IntegerLiteral(
-        Context, llvm::APSInt::get(0), TargetType, ThrowsExpr->getBeginLoc());
-    llvm::APSInt Value{2};
-    Value = 0;
-    return ConstantExpr::Create(Context, ZeroExpr, APValue{Value});
-  }
+  if (Converted.isInvalid())
+    return MakeZeroFallback();
 
   if (Result < 0 || Result > 2) {
-    EST = EST_ThrowsFalse;
     Diag(ThrowsExpr->getBeginLoc(),
          diag::err_throws_expression_value_out_of_range)
         << Result.getExtValue();
-    auto *ZeroExpr = new (Context) IntegerLiteral(
-        Context, llvm::APSInt::get(0), TargetType, ThrowsExpr->getBeginLoc());
-    llvm::APSInt Value{2};
-    Value = 0;
-    return ConstantExpr::Create(Context, ZeroExpr, APValue{Value});
+    return MakeZeroFallback();
   }
 
   if (Converted.get()->isValueDependent()) {
@@ -184,15 +178,11 @@ ExprResult Sema::ActOnThrowsSpecExpr(Expr *ThrowsExpr,
     return Converted;
   }
 
-  if (Result == 0)
-    EST = EST_ThrowsFalse;
-  else if (Result == 1)
-    EST = EST_ThrowsTrue;
-  else if (Result == 2)
-    EST = EST_ThrowsDynamic;
-  else
-    llvm_unreachable("unexpected throws expression result");
-
+  switch (Result.getExtValue()) {
+  case 0: EST = EST_ThrowsFalse; break;
+  case 1: EST = EST_ThrowsTrue; break;
+  case 2: EST = EST_ThrowsDynamic; break;
+  }
   return Converted;
 }
 

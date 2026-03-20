@@ -10,12 +10,9 @@
 #ifndef _LIBCPP_STDERROR
 #define _LIBCPP_STDERROR
 
-// P0709R4 / P1028R6: Static exception specifications and std::error
-
 #include <__config>
 #include <cstddef>
 #include <cstdint>
-#include <cstring>
 #include <system_error>
 
 #if !defined(_LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER)
@@ -25,20 +22,30 @@
 _LIBCPP_BEGIN_NAMESPACE_STD
 
 /// Tri-state value for throws(expr) specification.
-enum class except_t : unsigned char {
-  no_except      = 0, ///< Function does not throw.
-  static_except  = 1, ///< Function throws std::error (static exceptions).
-  dynamic_except = 2  ///< Function may throw dynamic exceptions.
-};
+enum class except_t : unsigned char { no_except = 0, static_except = 1, dynamic_except = 2 };
+
+// Forward declarations.
+template <class DomainType>
+class status_code;
+class _generic_code_domain;
+using generic_code = status_code<_generic_code_domain>;
 
 /// Abstract base class for status code domains (P1028R6).
+///
+/// Modelled after ned14/status-code status_code_domain. Each domain is
+/// identified by a random 64-bit unique id and provides virtual operations
+/// on the payload carried by a status_code.
 class status_code_domain {
-public:
-  using unique_id_type = uint64_t;
+  template <class DomainType>
+  friend class status_code;
 
-protected:
+public:
+  using unique_id_type = unsigned long long;
+
+private:
   unique_id_type _id;
 
+protected:
   constexpr explicit status_code_domain(unique_id_type id) noexcept : _id(id) {}
 
   status_code_domain(const status_code_domain&)            = default;
@@ -49,78 +56,116 @@ protected:
 
 public:
   constexpr unique_id_type id() const noexcept { return _id; }
-
   constexpr bool operator==(const status_code_domain& o) const noexcept { return _id == o._id; }
-  constexpr bool operator!=(const status_code_domain& o) const noexcept { return _id != o._id; }
 
-  virtual const char* name() const noexcept                     = 0;
-  virtual bool do_failure(intptr_t value) const noexcept        = 0;
-  virtual const char* do_message(intptr_t value) const noexcept = 0;
+  /// Human-readable name of this domain.
+  virtual const char* name() const noexcept = 0;
+  /// True if the code value represents a failure.
+  virtual bool do_failure(const status_code<void>& code) const noexcept = 0;
+  /// Human-readable message for the code value.
+  virtual const char* do_message(const status_code<void>& code) const noexcept = 0;
 };
 
-/// The generic error domain maps std::errc values.
-class _GenericCodeDomain final : public status_code_domain {
+/// Type-erased status code base. Holds only the domain pointer; the payload
+/// lives in derived classes. Passed around by const lvalue reference.
+template <>
+class status_code<void> {
+  template <class DomainType>
+  friend class status_code;
+
+protected:
+  const status_code_domain* _domain{nullptr};
+
+  status_code() = default;
+  constexpr explicit status_code(const status_code_domain* d) noexcept : _domain(d) {}
+  status_code(const status_code&)            = default;
+  status_code(status_code&&)                 = default;
+  status_code& operator=(const status_code&) = default;
+  status_code& operator=(status_code&&)      = default;
+  ~status_code()                             = default;
+
 public:
-  constexpr _GenericCodeDomain() noexcept : status_code_domain(0x7c8e42c1d05d7c13ULL) {}
+  constexpr bool empty() const noexcept { return _domain == nullptr; }
+  constexpr const status_code_domain& domain() const noexcept { return *_domain; }
+  bool failure() const noexcept { return _domain && _domain->do_failure(*this); }
+  const char* message() const noexcept { return _domain ? _domain->do_message(*this) : "(empty)"; }
+};
 
-  static constexpr const _GenericCodeDomain& get() noexcept { return _instance; }
+/// Typed status code. The DomainType defines the value_type carried alongside
+/// the domain pointer.
+template <class DomainType>
+class status_code : public status_code<void> {
+  template <class T>
+  friend class status_code;
 
-  const char* name() const noexcept override { return "generic"; }
+public:
+  using domain_type = DomainType;
+  using value_type  = typename DomainType::value_type;
 
-  bool do_failure(intptr_t value) const noexcept override { return value != 0; }
+  status_code()                              = default;
+  status_code(const status_code&)            = default;
+  status_code(status_code&&)                 = default;
+  status_code& operator=(const status_code&) = default;
+  status_code& operator=(status_code&&)      = default;
+  ~status_code()                             = default;
 
-  const char* do_message(intptr_t value) const noexcept override {
-    // Defer to the standard generic_category for message.
-    // In a full implementation this would be more elaborate.
-    if (value == 0)
-      return "success";
-    return "error";
+  template <class... Args>
+  constexpr explicit status_code(const DomainType& d, Args&&... args) noexcept
+      : status_code<void>(&d), _value(static_cast<Args&&>(args)...) {}
+
+  constexpr const value_type& value() const noexcept { return _value; }
+
+private:
+  value_type _value{};
+};
+
+/// The generic code domain maps std::errc values (POSIX).
+class _generic_code_domain final : public status_code_domain {
+public:
+  using value_type = errc;
+
+  constexpr _generic_code_domain() noexcept : status_code_domain(0x746d6354f4f733e9ULL) {}
+
+  static constexpr const _generic_code_domain& get() noexcept;
+
+  const char* name() const noexcept override { return "generic domain"; }
+
+  bool do_failure(const status_code<void>& code) const noexcept override {
+    return static_cast<const generic_code&>(code).value() != errc{0};
   }
 
-  static constexpr _GenericCodeDomain _instance{};
-};
-
-inline constexpr _GenericCodeDomain _GenericCodeDomain::_instance;
-
-/// The system_error_code domain wraps std::error_code.
-class _SystemErrorCodeDomain final : public status_code_domain {
-public:
-  constexpr _SystemErrorCodeDomain() noexcept : status_code_domain(0xa53a1f5b2a6f1720ULL) {}
-
-  static constexpr const _SystemErrorCodeDomain& get() noexcept { return _instance; }
-
-  const char* name() const noexcept override { return "system_error_code"; }
-
-  bool do_failure(intptr_t value) const noexcept override { return value != 0; }
-
-  const char* do_message(intptr_t value) const noexcept override {
-    if (value == 0)
-      return "success";
-    return "system error";
+  const char* do_message(const status_code<void>& code) const noexcept override {
+    auto v = static_cast<int>(static_cast<const generic_code&>(code).value());
+    // Reuse the standard generic_category for messages.
+    return generic_category().message(v).c_str();
   }
-
-  static constexpr _SystemErrorCodeDomain _instance{};
 };
 
-inline constexpr _SystemErrorCodeDomain _SystemErrorCodeDomain::_instance;
+inline constexpr _generic_code_domain _generic_code_domain_instance{};
+
+constexpr const _generic_code_domain& _generic_code_domain::get() noexcept { return _generic_code_domain_instance; }
+
+inline generic_code make_status_code(errc c) noexcept { return generic_code(_generic_code_domain::get(), c); }
 
 /// Type-erased error type for P0709 static exceptions.
 ///
-/// Size: two pointers (domain pointer + payload).
-/// Always represents a failure - there is no "success" state.
-/// Trivially relocatable.
+/// Two pointers in size (domain pointer + payload). Always represents a
+/// failure -- there is no "success" state. Trivially copyable.
 class error {
   const status_code_domain* _domain;
   intptr_t _value;
 
 public:
-  error() noexcept : _domain(&_GenericCodeDomain::get()), _value(-1) {}
+  /// Default-constructs to a generic "unknown error".
+  error() noexcept : _domain(&_generic_code_domain::get()), _value(-1) {}
 
   error(const status_code_domain& domain, intptr_t value) noexcept : _domain(&domain), _value(value) {}
 
-  error(errc ec) noexcept : _domain(&_GenericCodeDomain::get()), _value(static_cast<intptr_t>(ec)) {}
+  /// Implicit construction from std::errc.
+  error(errc ec) noexcept : _domain(&_generic_code_domain::get()), _value(static_cast<intptr_t>(ec)) {}
 
-  error(error_code ec) noexcept : _domain(&_SystemErrorCodeDomain::get()), _value(static_cast<intptr_t>(ec.value())) {}
+  /// Implicit construction from std::error_code.
+  error(error_code ec) noexcept : _domain(&_generic_code_domain::get()), _value(static_cast<intptr_t>(ec.value())) {}
 
   error(const error&) noexcept            = default;
   error(error&&) noexcept                 = default;
@@ -130,19 +175,24 @@ public:
 
   const status_code_domain& domain() const noexcept { return *_domain; }
   intptr_t value() const noexcept { return _value; }
-  bool failure() const noexcept { return _domain->do_failure(_value); }
-  const char* message() const noexcept { return _domain->do_message(_value); }
+  const char* message() const noexcept;
 
-  bool operator==(const error& other) const noexcept { return _domain == other._domain && _value == other._value; }
-  bool operator!=(const error& other) const noexcept { return !(*this == other); }
-
+  bool operator==(const error& o) const noexcept { return _domain == o._domain && _value == o._value; }
   bool operator==(errc ec) const noexcept {
-    return *_domain == _GenericCodeDomain::get() && _value == static_cast<intptr_t>(ec);
+    return *_domain == _generic_code_domain::get() && _value == static_cast<intptr_t>(ec);
   }
-  bool operator!=(errc ec) const noexcept { return !(*this == ec); }
 };
 
 static_assert(sizeof(error) == 2 * sizeof(void*), "std::error must be exactly two pointers in size");
+
+// Out-of-line to avoid calling generic_category().message() in the header's
+// include-time evaluation (it returns a std::string, which is not trivial).
+inline const char* error::message() const noexcept {
+  // For the generic domain, delegate to generic_category().
+  if (*_domain == _generic_code_domain::get())
+    return generic_category().message(static_cast<int>(_value)).c_str();
+  return _domain->name();
+}
 
 _LIBCPP_END_NAMESPACE_STD
 

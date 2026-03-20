@@ -4000,6 +4000,8 @@ ExceptionSpecificationType Parser::tryParseExceptionSpecification(
         ParseDynamicExceptionSpecification(NoexceptRange, DynamicExceptions,
                                            DynamicExceptionRanges);
       }
+      if (getLangOpts().Herbception && Tok.is(tok::kw_throws))
+        Diag(Tok.getLocation(), diag::err_dynamic_and_noexcept_specification);
     } else {
       Diag(Tok.getLocation(), diag::err_dynamic_and_noexcept_specification);
     }

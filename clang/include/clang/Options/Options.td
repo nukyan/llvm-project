@@ -2309,8 +2309,7 @@ defm assume_nothrow_exception_dtor: BoolFOption<"assume-nothrow-exception-dtor",
   NegFlag<SetFalse>>;
 defm herbception: BoolFOption<"herbception",
   LangOpts<"Herbception">, DefaultFalse,
-  PosFlag<SetTrue, [], [ClangOption, CC1Option],
-          "Enable static exception specifications (P0709 throws)">,
+  PosFlag<SetTrue, [], [ClangOption, CC1Option], "Enable static exception specifications">,
   NegFlag<SetFalse>>;
 def winx64_eh_unwindv2
     : Joined<["-"], "fwinx64-eh-unwindv2=">, Group<f_Group>,

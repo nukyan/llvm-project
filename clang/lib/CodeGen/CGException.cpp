@@ -448,15 +448,12 @@ void CodeGenFunction::EmitCXXThrowExpr(const CXXThrowExpr *E,
   // P0709 static exception specification: throw stores the error and
   // branches to the return block rather than unwinding.
   if (CurFnInfo && CurFnInfo->isStaticExceptionSpecification()) {
-    const Expr *SubExpr = E->getSubExpr();
-    if (SubExpr) {
-      // Store the error value and return.
-      // For now, emit the sub-expression and discard it.
-      // Full implementation will store into the error return slot.
+    // TODO(P0709): store the error into the return aggregate and branch to
+    // the return block. For now we evaluate the operand for side-effects and
+    // trap, so that incomplete codegen is not silently miscompiled.
+    if (const Expr *SubExpr = E->getSubExpr())
       EmitAnyExpr(SubExpr);
-    }
-    // Branch to the return block. The caller will see the error.
-    EmitBranchThroughCleanup(ReturnBlock);
+    EmitTrapCall(llvm::Intrinsic::trap);
 
     if (KeepInsertionPoint)
       EmitBlock(createBasicBlock("throw.cont"));

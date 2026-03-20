@@ -4998,8 +4998,10 @@ QualType ASTContext::getFunctionTypeInternal(
     if (OnlyWantCanonical ||
         (!isComputedNoexcept(EPI.ExceptionSpec.Type) &&
          !isComputedThrows(EPI.ExceptionSpec.Type)) ||
-        EPI.ExceptionSpec.NoexceptExpr == FPT->getNoexceptExpr() ||
-        EPI.ExceptionSpec.ThrowsExpr == FPT->getThrowsExpr())
+        (isComputedNoexcept(EPI.ExceptionSpec.Type) &&
+         EPI.ExceptionSpec.NoexceptExpr == FPT->getNoexceptExpr()) ||
+        (isComputedThrows(EPI.ExceptionSpec.Type) &&
+         EPI.ExceptionSpec.ThrowsExpr == FPT->getThrowsExpr()))
       return Existing;
 
     // We need a new type sugar node for this one, to hold the new noexcept

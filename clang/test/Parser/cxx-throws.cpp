@@ -15,9 +15,6 @@ struct S {
   void m2() const throws;
 };
 
-// Throws without -fherbception should fail
-// (tested separately - this file uses -fherbception)
-
 // Throws cannot be combined with throw()
 void f_bad1() throw() throws; // expected-error {{cannot have both}}
 
