@@ -908,9 +908,20 @@ public:
     const FormatToken *NamespaceTok = this;
     if (is(tok::comment))
       NamespaceTok = NamespaceTok->getNextNonComment();
-    // Detect "(inline|export)? namespace" in the beginning of a line.
-    if (NamespaceTok && NamespaceTok->isOneOf(tok::kw_inline, tok::kw_export))
-      NamespaceTok = NamespaceTok->getNextNonComment();
+    // Skip any qualifiers before 'namespace': extern "C", inline, export.
+    while (NamespaceTok) {
+      if (NamespaceTok->isOneOf(tok::kw_inline, tok::kw_export)) {
+        NamespaceTok = NamespaceTok->getNextNonComment();
+      } else if (NamespaceTok->is(tok::kw_extern)) {
+        NamespaceTok = NamespaceTok->getNextNonComment();
+        if (NamespaceTok && NamespaceTok->isStringLiteral())
+          NamespaceTok = NamespaceTok->getNextNonComment();
+        else
+          return nullptr;
+      } else {
+        break;
+      }
+    }
     return NamespaceTok &&
                    NamespaceTok->isOneOf(tok::kw_namespace, TT_NamespaceMacro)
                ? NamespaceTok

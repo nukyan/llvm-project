@@ -1623,6 +1623,12 @@ void UnwrappedLineParser::parseStructuralElement(
         addUnwrappedLine();
         return;
       }
+      while (FormatTok->isOneOf(tok::kw_inline, tok::kw_export))
+        nextToken();
+      if (FormatTok->is(tok::kw_namespace)) {
+        parseNamespace();
+        return;
+      }
     }
     break;
   case tok::kw_export:
@@ -1636,6 +1642,8 @@ void UnwrappedLineParser::parseStructuralElement(
     }
     if (IsCpp) {
       nextToken();
+      if (FormatTok->is(tok::kw_inline))
+        nextToken();
       if (FormatTok->is(tok::kw_namespace)) {
         parseNamespace();
         return;
